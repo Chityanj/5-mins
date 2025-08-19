@@ -98,6 +98,133 @@
       .gemini { background: #4285f4; }
       .deepseek { background: #8b5cf6; }
       
+      .settings-btn {
+        padding: 8px 12px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        cursor: pointer;
+        font-size: 12px;
+        margin-top: auto;
+        transition: all 0.2s;
+      }
+      
+      .settings-btn:hover { background: var(--border); }
+      
+      .settings-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      
+      .settings-modal.show { display: flex; }
+      
+      .settings-content {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+      
+      .settings-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      
+      .settings-title {
+        font-size: 18px;
+        font-weight: 600;
+      }
+      
+      .close-btn {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: var(--text-muted);
+        padding: 4px;
+      }
+      
+      .close-btn:hover { color: var(--text); }
+      
+      .api-key-group {
+        margin-bottom: 16px;
+      }
+      
+      .api-key-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      
+      .api-key-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--text);
+        font-family: 'Monaco', 'Menlo', monospace;
+        font-size: 12px;
+      }
+      
+      .api-key-input::placeholder {
+        color: var(--text-muted);
+        font-family: inherit;
+      }
+      
+      .api-key-status {
+        margin-top: 4px;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      
+      .status-indicator {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      
+      .status-configured { 
+        background: #22c55e; 
+        color: #22c55e;
+      }
+      
+      .status-missing { 
+        background: #f59e0b; 
+        color: #f59e0b;
+      }
+      
+      .settings-note {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 16px;
+        line-height: 1.4;
+      }
+      
       .chat-area {
         flex: 1;
         display: flex;
@@ -274,9 +401,7 @@
           </button>
         </div>
         
-        <div class="status" id="status">
-          Configure API keys in Netlify environment variables
-        </div>
+        <button class="settings-btn" id="settings-btn">⚙️ API Settings</button>
       </div>
       
       <div class="chat-area">
@@ -313,6 +438,94 @@
       </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div class="settings-modal" id="settings-modal">
+      <div class="settings-content">
+        <div class="settings-header">
+          <div class="settings-title">API Settings</div>
+          <button class="close-btn" id="close-settings">×</button>
+        </div>
+        
+        <div class="api-key-group">
+          <div class="api-key-label">
+            <div class="model-icon claude">C</div>
+            <span>Anthropic Claude</span>
+          </div>
+          <input 
+            type="password" 
+            class="api-key-input" 
+            id="anthropic-key"
+            placeholder="sk-ant-api03-..."
+          />
+          <div class="api-key-status">
+            <div class="status-indicator status-missing" id="anthropic-status"></div>
+            <span id="anthropic-status-text">Not configured</span>
+          </div>
+        </div>
+
+        <div class="api-key-group">
+          <div class="api-key-label">
+            <div class="model-icon gpt">G</div>
+            <span>OpenAI ChatGPT</span>
+          </div>
+          <input 
+            type="password" 
+            class="api-key-input" 
+            id="openai-key"
+            placeholder="sk-..."
+          />
+          <div class="api-key-status">
+            <div class="status-indicator status-missing" id="openai-status"></div>
+            <span id="openai-status-text">Not configured</span>
+          </div>
+        </div>
+
+        <div class="api-key-group">
+          <div class="api-key-label">
+            <div class="model-icon gemini">G</div>
+            <span>Google Gemini</span>
+          </div>
+          <input 
+            type="password" 
+            class="api-key-input" 
+            id="google-key"
+            placeholder="AIzaSy..."
+          />
+          <div class="api-key-status">
+            <div class="status-indicator status-missing" id="google-status"></div>
+            <span id="google-status-text">Not configured</span>
+          </div>
+        </div>
+
+        <div class="api-key-group">
+          <div class="api-key-label">
+            <div class="model-icon deepseek">D</div>
+            <span>DeepSeek</span>
+          </div>
+          <input 
+            type="password" 
+            class="api-key-input" 
+            id="deepseek-key"
+            placeholder="sk-..."
+          />
+          <div class="api-key-status">
+            <div class="status-indicator status-missing" id="deepseek-status"></div>
+            <span id="deepseek-status-text">Not configured</span>
+          </div>
+        </div>
+
+        <div class="settings-note">
+          <strong>🔒 Privacy:</strong> API keys are stored locally in your browser and sent directly to the AI providers. They are never stored on our servers.
+          <br><br>
+          <strong>🔗 Get API Keys:</strong>
+          <br>• <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a>
+          <br>• <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>
+          <br>• <a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a>
+          <br>• <a href="https://platform.deepseek.com/" target="_blank">DeepSeek Platform</a>
+        </div>
+      </div>
+    </div>
+
     <script>
       const API = '/api/chat';
       let currentModel = 'claude';
@@ -331,8 +544,79 @@
         messages: document.getElementById('messages'),
         currentModel: document.getElementById('current-model'),
         currentIcon: document.getElementById('current-icon'),
-        status: document.getElementById('status')
+        settingsBtn: document.getElementById('settings-btn'),
+        settingsModal: document.getElementById('settings-modal'),
+        closeSettings: document.getElementById('close-settings'),
+        anthropicKey: document.getElementById('anthropic-key'),
+        openaiKey: document.getElementById('openai-key'),
+        googleKey: document.getElementById('google-key'),
+        deepseekKey: document.getElementById('deepseek-key')
       };
+      
+      // API key management
+      const apiKeys = {
+        anthropic: '',
+        openai: '',
+        google: '',
+        deepseek: ''
+      };
+      
+      // Load API keys from localStorage
+      function loadApiKeys() {
+        try {
+          const stored = localStorage.getItem('aiChatApiKeys');
+          if (stored) {
+            const keys = JSON.parse(stored);
+            apiKeys.anthropic = keys.anthropic || '';
+            apiKeys.openai = keys.openai || '';
+            apiKeys.google = keys.google || '';
+            apiKeys.deepseek = keys.deepseek || '';
+            
+            // Update input fields (show masked values)
+            elements.anthropicKey.value = apiKeys.anthropic ? '••••••••••••••••' : '';
+            elements.openaiKey.value = apiKeys.openai ? '••••••••••••••••' : '';
+            elements.googleKey.value = apiKeys.google ? '••••••••••••••••' : '';
+            elements.deepseekKey.value = apiKeys.deepseek ? '••••••••••••••••' : '';
+            
+            updateApiKeyStatus();
+          }
+        } catch (e) {
+          console.error('Error loading API keys:', e);
+        }
+      }
+      
+      // Save API keys to localStorage
+      function saveApiKeys() {
+        try {
+          localStorage.setItem('aiChatApiKeys', JSON.stringify(apiKeys));
+          updateApiKeyStatus();
+        } catch (e) {
+          console.error('Error saving API keys:', e);
+        }
+      }
+      
+      // Update API key status indicators
+      function updateApiKeyStatus() {
+        const keyMap = {
+          anthropic: { key: apiKeys.anthropic, indicator: 'anthropic-status', text: 'anthropic-status-text' },
+          openai: { key: apiKeys.openai, indicator: 'openai-status', text: 'openai-status-text' },
+          google: { key: apiKeys.google, indicator: 'google-status', text: 'google-status-text' },
+          deepseek: { key: apiKeys.deepseek, indicator: 'deepseek-status', text: 'deepseek-status-text' }
+        };
+        
+        Object.entries(keyMap).forEach(([name, config]) => {
+          const indicator = document.getElementById(config.indicator);
+          const text = document.getElementById(config.text);
+          
+          if (config.key && config.key.length > 10) {
+            indicator.className = 'status-indicator status-configured';
+            text.textContent = 'Configured';
+          } else {
+            indicator.className = 'status-indicator status-missing';
+            text.textContent = 'Not configured';
+          }
+        });
+      }
       
       // Model selection
       document.querySelectorAll('.model-btn').forEach(btn => {
@@ -396,7 +680,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               model: currentModel,
-              message: text
+              message: text,
+              apiKeys: apiKeys
             })
           });
           
@@ -465,7 +750,59 @@
         if (loadingDiv) loadingDiv.remove();
       }
       
-      // Event listeners
+      // Settings modal event listeners
+      elements.settingsBtn.addEventListener('click', () => {
+        elements.settingsModal.classList.add('show');
+      });
+      
+      elements.closeSettings.addEventListener('click', () => {
+        elements.settingsModal.classList.remove('show');
+      });
+      
+      elements.settingsModal.addEventListener('click', (e) => {
+        if (e.target === elements.settingsModal) {
+          elements.settingsModal.classList.remove('show');
+        }
+      });
+      
+      // API key input handlers
+      function setupApiKeyInput(inputElement, keyName) {
+        let isEditing = false;
+        
+        inputElement.addEventListener('focus', () => {
+          if (!isEditing && apiKeys[keyName]) {
+            inputElement.value = apiKeys[keyName];
+            isEditing = true;
+          }
+        });
+        
+        inputElement.addEventListener('blur', () => {
+          if (isEditing) {
+            const value = inputElement.value.trim();
+            if (value && value !== '••••••••••••••••') {
+              apiKeys[keyName] = value;
+              saveApiKeys();
+              inputElement.value = '••••••••••••••••';
+            } else if (!value) {
+              apiKeys[keyName] = '';
+              saveApiKeys();
+              inputElement.value = '';
+            }
+            isEditing = false;
+          }
+        });
+        
+        inputElement.addEventListener('input', () => {
+          isEditing = true;
+        });
+      }
+      
+      setupApiKeyInput(elements.anthropicKey, 'anthropic');
+      setupApiKeyInput(elements.openaiKey, 'openai');
+      setupApiKeyInput(elements.googleKey, 'google');
+      setupApiKeyInput(elements.deepseekKey, 'deepseek');
+      
+      // Main event listeners
       elements.send.addEventListener('click', sendMessage);
       elements.input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -474,7 +811,8 @@
         }
       });
       
-      // Focus input on load
+      // Initialize
+      loadApiKeys();
       elements.input.focus();
     </script>
   </body>
