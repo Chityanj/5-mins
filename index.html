@@ -1,132 +1,483 @@
  <!doctype html>
- <html lang="en">
-   <head>
-     <meta charset="utf-8" />
-     <meta name="viewport" content="width=device-width, initial-scale=1" />
-     <title>5 min project — T3 Chat Clone</title>
-     <style>
-       :root { color-scheme: light dark; }
-       * { box-sizing: border-box; }
-       body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
-       .container { max-width: 760px; margin: 0 auto; padding: 24px; }
-       h1 { margin: 0 0 12px; font-size: 24px; }
-       .card { border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas); border-radius: 12px; padding: 16px; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
-       .row { display: flex; gap: 8px; }
-       input, textarea, button { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas); background: Canvas; color: CanvasText; }
-       textarea { resize: vertical; min-height: 64px; }
-       button { width: auto; cursor: pointer; }
-       .messages { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; max-height: 60vh; overflow: auto; padding-right: 4px; }
-       .msg { border: 1px solid color-mix(in oklab, CanvasText 15%, Canvas); border-radius: 12px; padding: 10px 12px; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
-       .meta { font-size: 12px; opacity: 0.7; margin-bottom: 6px; display: flex; gap: 8px; align-items: baseline; }
-       .author { font-weight: 600; }
-       .text { white-space: pre-wrap; word-wrap: break-word; }
-       .muted { opacity: 0.6; }
-     </style>
-   </head>
-   <body>
-     <div class="container">
-       <h1>5 min project</h1>
-       <div class="card" style="margin-bottom: 16px;">
-         <div class="row" style="margin-bottom: 8px;">
-           <input id="name" placeholder="Your name (optional, default: anon)" />
-         </div>
-         <div class="row">
-           <textarea id="text" placeholder="Write a message..."></textarea>
-         </div>
-         <div class="row" style="justify-content: end; margin-top: 8px;">
-           <button id="send">Send</button>
-         </div>
-         <div class="muted" style="margin-top: 6px; font-size: 12px;">Backed by Upstash if configured, otherwise ephemeral in-memory.</div>
-       </div>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>5 min project — Multi-AI Chat</title>
+    <style>
+      :root { 
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --surface: #f8f9fa;
+        --border: #e1e5e9;
+        --text: #1f2937;
+        --text-muted: #6b7280;
+        --accent: #3b82f6;
+        --accent-hover: #2563eb;
+        --user-bg: #3b82f6;
+        --assistant-bg: #f3f4f6;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f0f0f;
+          --surface: #1a1a1a;
+          --border: #2a2a2a;
+          --text: #ffffff;
+          --text-muted: #a1a1aa;
+          --accent: #3b82f6;
+          --accent-hover: #60a5fa;
+          --user-bg: #3b82f6;
+          --assistant-bg: #1f2937;
+        }
+      }
+      
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        overflow: hidden;
+      }
+      
+      .app { display: flex; height: 100vh; }
+      
+      .sidebar {
+        width: 280px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+      }
+      
+      .logo { font-size: 20px; font-weight: 600; margin-bottom: 24px; }
+      
+      .model-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+      
+      .model-btn {
+        padding: 12px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.2s;
+        font-size: 14px;
+      }
+      
+      .model-btn:hover { background: var(--surface); }
+      .model-btn.active { 
+        background: var(--accent); 
+        color: white; 
+        border-color: var(--accent);
+      }
+      
+      .model-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: bold;
+        color: white;
+      }
+      
+      .claude { background: #ff6b35; }
+      .gpt { background: #10a37f; }
+      .gemini { background: #4285f4; }
+      .deepseek { background: #8b5cf6; }
+      
+      .chat-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .chat-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      
+      .message {
+        display: flex;
+        gap: 12px;
+        max-width: 100%;
+      }
+      
+      .message.user {
+        flex-direction: row-reverse;
+      }
+      
+      .message-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+        flex-shrink: 0;
+      }
+      
+      .user .message-avatar {
+        background: var(--user-bg);
+        color: white;
+      }
+      
+      .assistant .message-avatar {
+        background: var(--assistant-bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      
+      .message-content {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        max-width: 70%;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+      }
+      
+      .user .message-content {
+        background: var(--user-bg);
+        color: white;
+        border-color: var(--user-bg);
+      }
+      
+      .input-area {
+        padding: 24px;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+      }
+      
+      .input-container {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+      }
+      
+      .input-box {
+        flex: 1;
+        min-height: 44px;
+        max-height: 120px;
+        padding: 12px 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--bg);
+        color: var(--text);
+        resize: none;
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      
+      .send-btn {
+        padding: 12px 20px;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background 0.2s;
+      }
+      
+      .send-btn:hover { background: var(--accent-hover); }
+      .send-btn:disabled { 
+        background: var(--text-muted); 
+        cursor: not-allowed; 
+      }
+      
+      .status {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 8px;
+        text-align: center;
+      }
+      
+      .loading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+      
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--border);
+        border-top: 2px solid var(--accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      @media (max-width: 768px) {
+        .sidebar { width: 240px; }
+        .message-content { max-width: 85%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="sidebar">
+        <div class="logo">5 min project</div>
+        
+        <div class="model-selector">
+          <button class="model-btn active" data-model="claude">
+            <div class="model-icon claude">C</div>
+            <span>Claude</span>
+          </button>
+          <button class="model-btn" data-model="gpt">
+            <div class="model-icon gpt">G</div>
+            <span>ChatGPT</span>
+          </button>
+          <button class="model-btn" data-model="gemini">
+            <div class="model-icon gemini">G</div>
+            <span>Gemini</span>
+          </button>
+          <button class="model-btn" data-model="deepseek">
+            <div class="model-icon deepseek">D</div>
+            <span>DeepSeek</span>
+          </button>
+        </div>
+        
+        <div class="status" id="status">
+          Configure API keys in Netlify environment variables
+        </div>
+      </div>
+      
+      <div class="chat-area">
+        <div class="chat-header">
+          <div class="model-icon claude" id="current-icon">C</div>
+          <div>
+            <div id="current-model">Claude</div>
+            <div style="font-size: 12px; color: var(--text-muted);">AI Assistant</div>
+          </div>
+        </div>
+        
+        <div class="messages" id="messages">
+          <div class="message assistant">
+            <div class="message-avatar">
+              <div class="model-icon claude">C</div>
+            </div>
+            <div class="message-content">
+              Hello! I'm Claude. How can I help you today?
+            </div>
+          </div>
+        </div>
+        
+        <div class="input-area">
+          <div class="input-container">
+            <textarea 
+              class="input-box" 
+              id="input" 
+              placeholder="Type your message..."
+              rows="1"
+            ></textarea>
+            <button class="send-btn" id="send">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-       <div class="card">
-         <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
-           <div class="muted">Messages</div>
-           <button id="refresh" title="Refresh messages">Refresh</button>
-         </div>
-         <div id="messages" class="messages"></div>
-       </div>
-     </div>
-
-     <script>
-       const API = '/api/messages';
-       const el = {
-         name: document.getElementById('name'),
-         text: document.getElementById('text'),
-         send: document.getElementById('send'),
-         refresh: document.getElementById('refresh'),
-         messages: document.getElementById('messages'),
-       };
-
-       // Persist name in localStorage
-       try {
-         const saved = localStorage.getItem('name');
-         if (saved) el.name.value = saved;
-       } catch {}
-
-       function fmt(ts) {
-         try { return new Date(ts).toLocaleString(); } catch { return '' }
-       }
-
-       function render(messages) {
-         el.messages.innerHTML = '';
-         const sorted = [...messages].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-         for (const m of sorted) {
-           const item = document.createElement('div');
-           item.className = 'msg';
-           item.innerHTML = `
-             <div class="meta"><span class="author">${(m.author || 'anon').slice(0, 50)}</span><span class="muted">${fmt(m.timestamp)}</span></div>
-             <div class="text"></div>
-           `;
-           item.querySelector('.text').textContent = m.text || '';
-           el.messages.appendChild(item);
-         }
-         el.messages.scrollTop = el.messages.scrollHeight;
-       }
-
-       async function load() {
-         try {
-           const res = await fetch(API, { method: 'GET' });
-           if (!res.ok) throw new Error('Failed to load');
-           const data = await res.json();
-           render(Array.isArray(data.messages) ? data.messages : []);
-         } catch (e) {
-           console.error(e);
-         }
-       }
-
-       async function send() {
-         const author = (el.name.value || 'anon').trim().slice(0, 50);
-         const text = (el.text.value || '').trim();
-         if (!text) return;
-         try {
-           localStorage.setItem('name', author);
-         } catch {}
-         try {
-           const res = await fetch(API, {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ author, text }),
-           });
-           if (!res.ok) throw new Error('Failed to send');
-           el.text.value = '';
-           await load();
-         } catch (e) {
-           console.error(e);
-           alert('Failed to send message');
-         }
-       }
-
-       el.send.addEventListener('click', send);
-       el.refresh.addEventListener('click', load);
-       el.text.addEventListener('keydown', (e) => {
-         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();
-       });
-
-       load();
-       setInterval(load, 5000);
-     </script>
-   </body>
- </html>
+    <script>
+      const API = '/api/chat';
+      let currentModel = 'claude';
+      let isLoading = false;
+      
+      const models = {
+        claude: { name: 'Claude', icon: 'C', class: 'claude' },
+        gpt: { name: 'ChatGPT', icon: 'G', class: 'gpt' },
+        gemini: { name: 'Gemini', icon: 'G', class: 'gemini' },
+        deepseek: { name: 'DeepSeek', icon: 'D', class: 'deepseek' }
+      };
+      
+      const elements = {
+        input: document.getElementById('input'),
+        send: document.getElementById('send'),
+        messages: document.getElementById('messages'),
+        currentModel: document.getElementById('current-model'),
+        currentIcon: document.getElementById('current-icon'),
+        status: document.getElementById('status')
+      };
+      
+      // Model selection
+      document.querySelectorAll('.model-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const model = btn.dataset.model;
+          selectModel(model);
+        });
+      });
+      
+      function selectModel(model) {
+        currentModel = model;
+        const modelInfo = models[model];
+        
+        // Update UI
+        document.querySelectorAll('.model-btn').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.model === model);
+        });
+        
+        elements.currentModel.textContent = modelInfo.name;
+        elements.currentIcon.className = `model-icon ${modelInfo.class}`;
+        elements.currentIcon.textContent = modelInfo.icon;
+        
+        // Clear messages and show welcome
+        elements.messages.innerHTML = `
+          <div class="message assistant">
+            <div class="message-avatar">
+              <div class="model-icon ${modelInfo.class}">${modelInfo.icon}</div>
+            </div>
+            <div class="message-content">
+              Hello! I'm ${modelInfo.name}. How can I help you today?
+            </div>
+          </div>
+        `;
+      }
+      
+      // Auto-resize textarea
+      elements.input.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+      });
+      
+      // Send message
+      async function sendMessage() {
+        const text = elements.input.value.trim();
+        if (!text || isLoading) return;
+        
+        isLoading = true;
+        elements.send.disabled = true;
+        elements.input.value = '';
+        elements.input.style.height = 'auto';
+        
+        // Add user message
+        addMessage('user', text);
+        
+        // Add loading indicator
+        const loadingId = addLoadingMessage();
+        
+        try {
+          const response = await fetch(API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: currentModel,
+              message: text
+            })
+          });
+          
+          const data = await response.json();
+          
+          // Remove loading indicator
+          removeLoadingMessage(loadingId);
+          
+          if (response.ok) {
+            addMessage('assistant', data.response);
+          } else {
+            addMessage('assistant', `Error: ${data.error || 'Something went wrong'}`);
+          }
+        } catch (error) {
+          removeLoadingMessage(loadingId);
+          addMessage('assistant', `Error: ${error.message}`);
+        }
+        
+        isLoading = false;
+        elements.send.disabled = false;
+        elements.input.focus();
+      }
+      
+      function addMessage(role, content) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}`;
+        
+        const modelInfo = models[currentModel];
+        const avatarContent = role === 'user' 
+          ? 'U' 
+          : `<div class="model-icon ${modelInfo.class}">${modelInfo.icon}</div>`;
+        
+        messageDiv.innerHTML = `
+          <div class="message-avatar">${avatarContent}</div>
+          <div class="message-content">${content}</div>
+        `;
+        
+        elements.messages.appendChild(messageDiv);
+        elements.messages.scrollTop = elements.messages.scrollHeight;
+      }
+      
+      function addLoadingMessage() {
+        const loadingDiv = document.createElement('div');
+        const loadingId = 'loading-' + Date.now();
+        loadingDiv.id = loadingId;
+        loadingDiv.className = 'message assistant';
+        
+        const modelInfo = models[currentModel];
+        loadingDiv.innerHTML = `
+          <div class="message-avatar">
+            <div class="model-icon ${modelInfo.class}">${modelInfo.icon}</div>
+          </div>
+          <div class="message-content loading">
+            <div class="spinner"></div>
+            <span>Thinking...</span>
+          </div>
+        `;
+        
+        elements.messages.appendChild(loadingDiv);
+        elements.messages.scrollTop = elements.messages.scrollHeight;
+        return loadingId;
+      }
+      
+      function removeLoadingMessage(loadingId) {
+        const loadingDiv = document.getElementById(loadingId);
+        if (loadingDiv) loadingDiv.remove();
+      }
+      
+      // Event listeners
+      elements.send.addEventListener('click', sendMessage);
+      elements.input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+      
+      // Focus input on load
+      elements.input.focus();
+    </script>
+  </body>
+</html>
 
 
