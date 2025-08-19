@@ -1,0 +1,132 @@
+ <!doctype html>
+ <html lang="en">
+   <head>
+     <meta charset="utf-8" />
+     <meta name="viewport" content="width=device-width, initial-scale=1" />
+     <title>5 min project — T3 Chat Clone</title>
+     <style>
+       :root { color-scheme: light dark; }
+       * { box-sizing: border-box; }
+       body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+       .container { max-width: 760px; margin: 0 auto; padding: 24px; }
+       h1 { margin: 0 0 12px; font-size: 24px; }
+       .card { border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas); border-radius: 12px; padding: 16px; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
+       .row { display: flex; gap: 8px; }
+       input, textarea, button { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid color-mix(in oklab, CanvasText 20%, Canvas); background: Canvas; color: CanvasText; }
+       textarea { resize: vertical; min-height: 64px; }
+       button { width: auto; cursor: pointer; }
+       .messages { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; max-height: 60vh; overflow: auto; padding-right: 4px; }
+       .msg { border: 1px solid color-mix(in oklab, CanvasText 15%, Canvas); border-radius: 12px; padding: 10px 12px; background: color-mix(in oklab, Canvas 96%, CanvasText 4%); }
+       .meta { font-size: 12px; opacity: 0.7; margin-bottom: 6px; display: flex; gap: 8px; align-items: baseline; }
+       .author { font-weight: 600; }
+       .text { white-space: pre-wrap; word-wrap: break-word; }
+       .muted { opacity: 0.6; }
+     </style>
+   </head>
+   <body>
+     <div class="container">
+       <h1>5 min project</h1>
+       <div class="card" style="margin-bottom: 16px;">
+         <div class="row" style="margin-bottom: 8px;">
+           <input id="name" placeholder="Your name (optional, default: anon)" />
+         </div>
+         <div class="row">
+           <textarea id="text" placeholder="Write a message..."></textarea>
+         </div>
+         <div class="row" style="justify-content: end; margin-top: 8px;">
+           <button id="send">Send</button>
+         </div>
+         <div class="muted" style="margin-top: 6px; font-size: 12px;">Backed by Upstash if configured, otherwise ephemeral in-memory.</div>
+       </div>
+
+       <div class="card">
+         <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
+           <div class="muted">Messages</div>
+           <button id="refresh" title="Refresh messages">Refresh</button>
+         </div>
+         <div id="messages" class="messages"></div>
+       </div>
+     </div>
+
+     <script>
+       const API = '/api/messages';
+       const el = {
+         name: document.getElementById('name'),
+         text: document.getElementById('text'),
+         send: document.getElementById('send'),
+         refresh: document.getElementById('refresh'),
+         messages: document.getElementById('messages'),
+       };
+
+       // Persist name in localStorage
+       try {
+         const saved = localStorage.getItem('name');
+         if (saved) el.name.value = saved;
+       } catch {}
+
+       function fmt(ts) {
+         try { return new Date(ts).toLocaleString(); } catch { return '' }
+       }
+
+       function render(messages) {
+         el.messages.innerHTML = '';
+         const sorted = [...messages].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+         for (const m of sorted) {
+           const item = document.createElement('div');
+           item.className = 'msg';
+           item.innerHTML = `
+             <div class="meta"><span class="author">${(m.author || 'anon').slice(0, 50)}</span><span class="muted">${fmt(m.timestamp)}</span></div>
+             <div class="text"></div>
+           `;
+           item.querySelector('.text').textContent = m.text || '';
+           el.messages.appendChild(item);
+         }
+         el.messages.scrollTop = el.messages.scrollHeight;
+       }
+
+       async function load() {
+         try {
+           const res = await fetch(API, { method: 'GET' });
+           if (!res.ok) throw new Error('Failed to load');
+           const data = await res.json();
+           render(Array.isArray(data.messages) ? data.messages : []);
+         } catch (e) {
+           console.error(e);
+         }
+       }
+
+       async function send() {
+         const author = (el.name.value || 'anon').trim().slice(0, 50);
+         const text = (el.text.value || '').trim();
+         if (!text) return;
+         try {
+           localStorage.setItem('name', author);
+         } catch {}
+         try {
+           const res = await fetch(API, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ author, text }),
+           });
+           if (!res.ok) throw new Error('Failed to send');
+           el.text.value = '';
+           await load();
+         } catch (e) {
+           console.error(e);
+           alert('Failed to send message');
+         }
+       }
+
+       el.send.addEventListener('click', send);
+       el.refresh.addEventListener('click', load);
+       el.text.addEventListener('keydown', (e) => {
+         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();
+       });
+
+       load();
+       setInterval(load, 5000);
+     </script>
+   </body>
+ </html>
+
+
