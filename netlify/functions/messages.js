@@ -21,9 +21,10 @@ function jsonResponse(statusCode, data) {
 }
 
 // AI Model Integrations
-async function callClaude(message) {
-  if (!ANTHROPIC_API_KEY) {
-    return 'Claude API key not configured. Please add ANTHROPIC_API_KEY to your Netlify environment variables.';
+async function callClaude(message, apiKey) {
+  const key = apiKey || ANTHROPIC_API_KEY;
+  if (!key) {
+    return 'Claude API key not configured. Please add your Anthropic API key in the settings.';
   }
 
   try {
@@ -31,7 +32,7 @@ async function callClaude(message) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
+        'x-api-key': key,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
@@ -53,9 +54,10 @@ async function callClaude(message) {
   }
 }
 
-async function callChatGPT(message) {
-  if (!OPENAI_API_KEY) {
-    return 'OpenAI API key not configured. Please add OPENAI_API_KEY to your Netlify environment variables.';
+async function callChatGPT(message, apiKey) {
+  const key = apiKey || OPENAI_API_KEY;
+  if (!key) {
+    return 'OpenAI API key not configured. Please add your OpenAI API key in the settings.';
   }
 
   try {
@@ -63,7 +65,7 @@ async function callChatGPT(message) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${key}`,
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
@@ -85,13 +87,14 @@ async function callChatGPT(message) {
   }
 }
 
-async function callGemini(message) {
-  if (!GOOGLE_API_KEY) {
-    return 'Google API key not configured. Please add GOOGLE_API_KEY to your Netlify environment variables.';
+async function callGemini(message, apiKey) {
+  const key = apiKey || GOOGLE_API_KEY;
+  if (!key) {
+    return 'Google API key not configured. Please add your Google API key in the settings.';
   }
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -117,9 +120,10 @@ async function callGemini(message) {
   }
 }
 
-async function callDeepSeek(message) {
-  if (!DEEPSEEK_API_KEY) {
-    return 'DeepSeek API key not configured. Please add DEEPSEEK_API_KEY to your Netlify environment variables.';
+async function callDeepSeek(message, apiKey) {
+  const key = apiKey || DEEPSEEK_API_KEY;
+  if (!key) {
+    return 'DeepSeek API key not configured. Please add your DeepSeek API key in the settings.';
   }
 
   try {
@@ -127,7 +131,7 @@ async function callDeepSeek(message) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+        'Authorization': `Bearer ${key}`,
       },
       body: JSON.stringify({
         model: 'deepseek-chat',
@@ -149,16 +153,16 @@ async function callDeepSeek(message) {
   }
 }
 
-async function getAIResponse(model, message) {
+async function getAIResponse(model, message, apiKeys = {}) {
   switch (model) {
     case 'claude':
-      return await callClaude(message);
+      return await callClaude(message, apiKeys.anthropic);
     case 'gpt':
-      return await callChatGPT(message);
+      return await callChatGPT(message, apiKeys.openai);
     case 'gemini':
-      return await callGemini(message);
+      return await callGemini(message, apiKeys.google);
     case 'deepseek':
-      return await callDeepSeek(message);
+      return await callDeepSeek(message, apiKeys.deepseek);
     default:
       return `Unknown model: ${model}. Supported models: claude, gpt, gemini, deepseek`;
   }
@@ -185,7 +189,7 @@ exports.handler = async (event) => {
       return jsonResponse(400, { error: 'Invalid JSON' });
     }
 
-    const { model, message } = payload;
+    const { model, message, apiKeys } = payload;
     if (!model || !message) {
       return jsonResponse(400, { error: 'Missing model or message' });
     }
@@ -198,7 +202,7 @@ exports.handler = async (event) => {
       return jsonResponse(400, { error: 'Message too long (max 4000 chars)' });
     }
 
-    const response = await getAIResponse(model, message.trim());
+    const response = await getAIResponse(model, message.trim(), apiKeys || {});
     return jsonResponse(200, { response });
 
   } catch (error) {
