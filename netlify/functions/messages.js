@@ -1,114 +1,213 @@
  'use strict';
 
- const MAX_MESSAGES = 200;
- const MESSAGES_KEY = 'messages:global';
+// API Keys from environment variables
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 
- const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
- const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
- const hasUpstash = !!(redisUrl && redisToken);
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
- // In-memory fallback (ephemeral across cold starts)
- const inMemoryMessages = [];
+function jsonResponse(statusCode, data) {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    body: JSON.stringify(data),
+  };
+}
 
- const corsHeaders = {
-   'Access-Control-Allow-Origin': '*',
-   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-   'Access-Control-Allow-Headers': 'Content-Type',
- };
+// AI Model Integrations
+async function callClaude(message) {
+  if (!ANTHROPIC_API_KEY) {
+    return 'Claude API key not configured. Please add ANTHROPIC_API_KEY to your Netlify environment variables.';
+  }
 
- function jsonResponse(statusCode, data) {
-   return {
-     statusCode,
-     headers: { 'Content-Type': 'application/json', ...corsHeaders },
-     body: JSON.stringify(data),
-   };
- }
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: message }],
+      }),
+    });
 
- function generateId() {
-   const a = Math.random().toString(36).slice(2, 10);
-   const b = Date.now().toString(36).slice(-6);
-   return `${a}${b}`;
- }
+    if (!response.ok) {
+      const error = await response.text();
+      return `Claude API error: ${response.status} - ${error}`;
+    }
 
- async function upstash(command) {
-   if (!hasUpstash) throw new Error('Upstash not configured');
-   const res = await fetch(redisUrl, {
-     method: 'POST',
-     headers: {
-       Authorization: `Bearer ${redisToken}`,
-       'Content-Type': 'application/json',
-     },
-     body: JSON.stringify({ command }),
-   });
-   if (!res.ok) throw new Error(`Upstash HTTP ${res.status}`);
-   const data = await res.json();
-   if (data && data.error) throw new Error(String(data.error));
-   return data ? data.result : null;
- }
+    const data = await response.json();
+    return data.content?.[0]?.text || 'No response from Claude';
+  } catch (error) {
+    return `Error calling Claude: ${error.message}`;
+  }
+}
 
- async function getMessages() {
-   if (hasUpstash) {
-     const raw = await upstash(['LRANGE', MESSAGES_KEY, '0', String(MAX_MESSAGES - 1)]);
-     const list = (Array.isArray(raw) ? raw : [])
-       .map((s) => {
-         try { return JSON.parse(s); } catch { return null; }
-       })
-       .filter(Boolean);
-     return list;
-   }
-   return [...inMemoryMessages];
- }
+async function callChatGPT(message) {
+  if (!OPENAI_API_KEY) {
+    return 'OpenAI API key not configured. Please add OPENAI_API_KEY to your Netlify environment variables.';
+  }
 
- async function addMessage(message) {
-   if (hasUpstash) {
-     await upstash(['LPUSH', MESSAGES_KEY, JSON.stringify(message)]);
-     await upstash(['LTRIM', MESSAGES_KEY, '0', String(MAX_MESSAGES - 1)]);
-     return;
-   }
-   inMemoryMessages.unshift(message);
-   if (inMemoryMessages.length > MAX_MESSAGES) inMemoryMessages.length = MAX_MESSAGES;
- }
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: message }],
+        max_tokens: 1024,
+        temperature: 0.7,
+      }),
+    });
 
- exports.handler = async (event) => {
-   if (event.httpMethod === 'OPTIONS') {
-     return { statusCode: 204, headers: corsHeaders, body: '' };
-   }
+    if (!response.ok) {
+      const error = await response.text();
+      return `OpenAI API error: ${response.status} - ${error}`;
+    }
 
-   try {
-     if (event.httpMethod === 'GET') {
-       const messages = await getMessages();
-       return jsonResponse(200, { messages });
-     }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || 'No response from ChatGPT';
+  } catch (error) {
+    return `Error calling ChatGPT: ${error.message}`;
+  }
+}
 
-     if (event.httpMethod === 'POST') {
-       if (!event.body) return jsonResponse(400, { error: 'Missing body' });
-       let payload;
-       try {
-         payload = JSON.parse(event.body);
-       } catch {
-         return jsonResponse(400, { error: 'Invalid JSON' });
-       }
+async function callGemini(message) {
+  if (!GOOGLE_API_KEY) {
+    return 'Google API key not configured. Please add GOOGLE_API_KEY to your Netlify environment variables.';
+  }
 
-       const text = typeof payload.text === 'string' ? payload.text.trim() : '';
-       const author = typeof payload.author === 'string' ? payload.author.trim() : 'anon';
-       if (!text) return jsonResponse(400, { error: 'Text is required' });
-       if (text.length > 2000) return jsonResponse(400, { error: 'Text too long (max 2000 chars)' });
-       if (author.length > 50) return jsonResponse(400, { error: 'Author too long (max 50 chars)' });
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: message }] }],
+        generationConfig: {
+          maxOutputTokens: 1024,
+          temperature: 0.7,
+        },
+      }),
+    });
 
-       const message = {
-         id: generateId(),
-         text,
-         author: author || 'anon',
-         timestamp: Date.now(),
-       };
-       await addMessage(message);
-       return jsonResponse(201, { message });
-     }
+    if (!response.ok) {
+      const error = await response.text();
+      return `Gemini API error: ${response.status} - ${error}`;
+    }
 
-     return jsonResponse(405, { error: 'Method not allowed' });
-   } catch (error) {
-     return jsonResponse(500, { error: 'Internal error', details: String((error && error.message) || error) });
-   }
- };
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from Gemini';
+  } catch (error) {
+    return `Error calling Gemini: ${error.message}`;
+  }
+}
+
+async function callDeepSeek(message) {
+  if (!DEEPSEEK_API_KEY) {
+    return 'DeepSeek API key not configured. Please add DEEPSEEK_API_KEY to your Netlify environment variables.';
+  }
+
+  try {
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: message }],
+        max_tokens: 1024,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      return `DeepSeek API error: ${response.status} - ${error}`;
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || 'No response from DeepSeek';
+  } catch (error) {
+    return `Error calling DeepSeek: ${error.message}`;
+  }
+}
+
+async function getAIResponse(model, message) {
+  switch (model) {
+    case 'claude':
+      return await callClaude(message);
+    case 'gpt':
+      return await callChatGPT(message);
+    case 'gemini':
+      return await callGemini(message);
+    case 'deepseek':
+      return await callDeepSeek(message);
+    default:
+      return `Unknown model: ${model}. Supported models: claude, gpt, gemini, deepseek`;
+  }
+}
+
+exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders, body: '' };
+  }
+
+  if (event.httpMethod !== 'POST') {
+    return jsonResponse(405, { error: 'Method not allowed' });
+  }
+
+  try {
+    if (!event.body) {
+      return jsonResponse(400, { error: 'Missing body' });
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(event.body);
+    } catch {
+      return jsonResponse(400, { error: 'Invalid JSON' });
+    }
+
+    const { model, message } = payload;
+    if (!model || !message) {
+      return jsonResponse(400, { error: 'Missing model or message' });
+    }
+
+    if (typeof message !== 'string' || message.trim().length === 0) {
+      return jsonResponse(400, { error: 'Message must be a non-empty string' });
+    }
+
+    if (message.length > 4000) {
+      return jsonResponse(400, { error: 'Message too long (max 4000 chars)' });
+    }
+
+    const response = await getAIResponse(model, message.trim());
+    return jsonResponse(200, { response });
+
+  } catch (error) {
+    console.error('Handler error:', error);
+    return jsonResponse(500, { 
+      error: 'Internal server error', 
+      details: String((error && error.message) || error) 
+    });
+  }
+};
 
 
